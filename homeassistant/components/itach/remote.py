@@ -1,47 +1,64 @@
 """Support for iTach IR devices."""
 import logging
 
+import pyitachip2ir
 import voluptuous as vol
 
-import homeassistant.helpers.config_validation as cv
 from homeassistant.components import remote
+from homeassistant.components.remote import ATTR_NUM_REPEATS, PLATFORM_SCHEMA
 from homeassistant.const import (
-    DEVICE_DEFAULT_NAME, CONF_NAME, CONF_MAC, CONF_HOST, CONF_PORT,
-    CONF_DEVICES)
-from homeassistant.components.remote import PLATFORM_SCHEMA
+    CONF_DEVICES,
+    CONF_HOST,
+    CONF_MAC,
+    CONF_NAME,
+    CONF_PORT,
+    DEVICE_DEFAULT_NAME,
+)
+import homeassistant.helpers.config_validation as cv
 
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_PORT = 4998
 CONNECT_TIMEOUT = 5000
 
-CONF_MODADDR = 'modaddr'
-CONF_CONNADDR = 'connaddr'
-CONF_COMMANDS = 'commands'
-CONF_DATA = 'data'
+CONF_MODADDR = "modaddr"
+CONF_CONNADDR = "connaddr"
+CONF_COMMANDS = "commands"
+CONF_DATA = "data"
 
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
-    vol.Optional(CONF_MAC): cv.string,
-    vol.Required(CONF_HOST): cv.string,
-    vol.Optional(CONF_PORT, default=DEFAULT_PORT): cv.port,
-    vol.Required(CONF_DEVICES): vol.All(cv.ensure_list, [{
-        vol.Optional(CONF_NAME): cv.string,
-        vol.Optional(CONF_MODADDR): vol.Coerce(int),
-        vol.Required(CONF_CONNADDR): vol.Coerce(int),
-        vol.Required(CONF_COMMANDS): vol.All(cv.ensure_list, [{
-            vol.Required(CONF_NAME): cv.string,
-            vol.Required(CONF_DATA): cv.string,
-        }])
-    }])
-})
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
+    {
+        vol.Optional(CONF_MAC): cv.string,
+        vol.Required(CONF_HOST): cv.string,
+        vol.Optional(CONF_PORT, default=DEFAULT_PORT): cv.port,
+        vol.Required(CONF_DEVICES): vol.All(
+            cv.ensure_list,
+            [
+                {
+                    vol.Optional(CONF_NAME): cv.string,
+                    vol.Optional(CONF_MODADDR): vol.Coerce(int),
+                    vol.Required(CONF_CONNADDR): vol.Coerce(int),
+                    vol.Required(CONF_COMMANDS): vol.All(
+                        cv.ensure_list,
+                        [
+                            {
+                                vol.Required(CONF_NAME): cv.string,
+                                vol.Required(CONF_DATA): cv.string,
+                            }
+                        ],
+                    ),
+                }
+            ],
+        ),
+    }
+)
 
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up the ITach connection and devices."""
-    import pyitachip2ir
     itachip2ir = pyitachip2ir.ITachIP2IR(
-        config.get(CONF_MAC), config.get(CONF_HOST),
-        int(config.get(CONF_PORT)))
+        config.get(CONF_MAC), config.get(CONF_HOST), int(config.get(CONF_PORT))
+    )
 
     if not itachip2ir.ready(CONNECT_TIMEOUT):
         _LOGGER.error("Unable to find iTach")
@@ -60,14 +77,14 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
             cmddata = cmd[CONF_DATA].strip()
             if not cmddata:
                 cmddata = '""'
-            cmddatas += "{}\n{}\n".format(cmdname, cmddata)
+            cmddatas += f"{cmdname}\n{cmddata}\n"
         itachip2ir.addDevice(name, modaddr, connaddr, cmddatas)
         devices.append(ITachIP2IRRemote(itachip2ir, name))
     add_entities(devices, True)
     return True
 
 
-class ITachIP2IRRemote(remote.RemoteDevice):
+class ITachIP2IRRemote(remote.RemoteEntity):
     """Device that sends commands to an ITachIP2IR device."""
 
     def __init__(self, itachip2ir, name):
@@ -89,19 +106,22 @@ class ITachIP2IRRemote(remote.RemoteDevice):
     def turn_on(self, **kwargs):
         """Turn the device on."""
         self._power = True
-        self.itachip2ir.send(self._name, "ON", 1)
+        num_repeats = kwargs.get(ATTR_NUM_REPEATS, 1)
+        self.itachip2ir.send(self._name, "ON", num_repeats)
         self.schedule_update_ha_state()
 
     def turn_off(self, **kwargs):
         """Turn the device off."""
         self._power = False
-        self.itachip2ir.send(self._name, "OFF", 1)
+        num_repeats = kwargs.get(ATTR_NUM_REPEATS, 1)
+        self.itachip2ir.send(self._name, "OFF", num_repeats)
         self.schedule_update_ha_state()
 
     def send_command(self, command, **kwargs):
         """Send a command to one device."""
+        num_repeats = kwargs.get(ATTR_NUM_REPEATS, 1)
         for single_command in command:
-            self.itachip2ir.send(self._name, single_command, 1)
+            self.itachip2ir.send(self._name, single_command, num_repeats)
 
     def update(self):
         """Update the device."""

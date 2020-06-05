@@ -3,9 +3,11 @@ import logging
 
 from xs1_api_client.api_constants import ActuatorType
 
-from homeassistant.components.climate import ClimateDevice
+from homeassistant.components.climate import ClimateEntity
 from homeassistant.components.climate.const import (
-    SUPPORT_TARGET_TEMPERATURE, HVAC_MODE_HEAT)
+    HVAC_MODE_HEAT,
+    SUPPORT_TARGET_TEMPERATURE,
+)
 from homeassistant.const import ATTR_TEMPERATURE
 
 from . import ACTUATORS, DOMAIN as COMPONENT_DOMAIN, SENSORS, XS1DeviceEntity
@@ -35,13 +37,12 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
                     matching_sensor = sensor
                     break
 
-            thermostat_entities.append(
-                XS1ThermostatEntity(actuator, matching_sensor))
+            thermostat_entities.append(XS1ThermostatEntity(actuator, matching_sensor))
 
     add_entities(thermostat_entities)
 
 
-class XS1ThermostatEntity(XS1DeviceEntity, ClimateDevice):
+class XS1ThermostatEntity(XS1DeviceEntity, ClimateEntity):
     """Representation of a XS1 thermostat."""
 
     def __init__(self, device, sensor):
@@ -114,7 +115,6 @@ class XS1ThermostatEntity(XS1DeviceEntity, ClimateDevice):
 
     def set_hvac_mode(self, hvac_mode):
         """Set new target hvac mode."""
-        pass
 
     async def async_update(self):
         """Also update the sensor when available."""
